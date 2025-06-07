@@ -1,11 +1,15 @@
 import React from 'react';
 import logo from './logo.svg';
 import './App.css';
+import Custmor from './components/Custmor';
 
 function App() {
   return (
     <div className="App">
-     <h1>React with Typescript</h1>
+      <header className="App-header">
+        
+        <Custmor name="John Doe" title="Customer Service Representative" age={12}/>
+      </header>
     </div>
   );
 }
