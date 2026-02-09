@@ -63,3 +63,118 @@ aur input parameter FilingTransactionID ho.
 
 
 ```
+
+```
+USE [TESTDB]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[usp_PreparationDocumentConfig]
+(
+    @Action NVARCHAR(20), -- 'INSERT_CONFIG', 'INSERT_FUND', 'UPDATE_FUND', 'CHANGE_STATUS', 'GET'
+    @FilingTransactionID INT = NULL,
+    @DocumentName NVARCHAR(200) = NULL,
+    @DocumentSize INT = NULL,
+    @DocumentLogoPointer NVARCHAR(200) = NULL,
+    @CreatedBy INT = NULL,
+    @PreparationDocumentConfigurationId INT = NULL,
+    @FundID INT = NULL,
+    @PreparationDocumentFundConfigurationId INT = NULL,
+    @ReviewerQuery INT = NULL,
+    @ApproverQuery INT = NULL,
+    @Status NVARCHAR(50) = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        -- 1. Insert into Configuration + First Version
+        IF @Action = 'INSERT_CONFIG'
+        BEGIN
+            INSERT INTO PreparationDocumentConfiguration
+            (FilingTransactionID, DocumentName, DocumentSize, DocumentLogoPointer, CreatedBy)
+            VALUES (@FilingTransactionID, @DocumentName, @DocumentSize, @DocumentLogoPointer, @CreatedBy);
+
+            SET @PreparationDocumentConfigurationId = SCOPE_IDENTITY();
+
+            INSERT INTO PreparationDocumentConfigurationVersion
+            (PreparationDocumentConfigurationId, FilingTransactionID, DocumentName, DocumentSize, DocumentLogoPointer,
+             Status, VersionNo, CreatedBy, CreatedDate)
+            VALUES (@PreparationDocumentConfigurationId, @FilingTransactionID, @DocumentName, @DocumentSize, @DocumentLogoPointer,
+                    ISNULL(@Status,'Draft'), 1, @CreatedBy, GETDATE());
+
+            SELECT 'Configuration & First Version Inserted Successfully' AS Message;
+        END
+
+        -- 2. Insert Fund entry
+        ELSE IF @Action = 'INSERT_FUND'
+        BEGIN
+            INSERT INTO PreparationDocumentFundConfiguration
+            (PreparationDocumentConfigurationId, FundID, CreatedBy, CreatedDate)
+            VALUES (@PreparationDocumentConfigurationId, @FundID, @CreatedBy, GETDATE());
+
+            SELECT 'Fund Entry Inserted Successfully' AS Message;
+        END
+
+        -- 3. Update Fund Reviewer/Approver
+        ELSE IF @Action = 'UPDATE_FUND'
+        BEGIN
+            UPDATE PreparationDocumentFundConfiguration
+            SET ReviewerQuery = ISNULL(@ReviewerQuery, ReviewerQuery),
+                ApproverQuery = ISNULL(@ApproverQuery, ApproverQuery),
+                UpdatedBy = @CreatedBy,
+                UpdatedDate = GETDATE()
+            WHERE PreparationDocumentFundConfigurationId = @PreparationDocumentFundConfigurationId;
+
+            SELECT 'Fund Entry Updated Successfully' AS Message;
+        END
+
+        -- 4. Status Change → New Version
+        ELSE IF @Action = 'CHANGE_STATUS'
+        BEGIN
+            DECLARE @CurrentVersion INT;
+            SELECT @CurrentVersion = MAX(VersionNo)
+            FROM PreparationDocumentConfigurationVersion
+            WHERE PreparationDocumentConfigurationId = @PreparationDocumentConfigurationId;
+
+            INSERT INTO PreparationDocumentConfigurationVersion
+            (PreparationDocumentConfigurationId, FilingTransactionID, DocumentName, DocumentSize, DocumentLogoPointer,
+             Status, VersionNo, CreatedBy, CreatedDate)
+            SELECT PreparationDocumentConfigurationId, FilingTransactionID, DocumentName, DocumentSize, DocumentLogoPointer,
+                   @Status, @CurrentVersion + 1, @CreatedBy, GETDATE()
+            FROM PreparationDocumentConfiguration
+            WHERE PreparationDocumentConfigurationId = @PreparationDocumentConfigurationId;
+
+            SELECT 'New Version Inserted Successfully with Status Change' AS Message;
+        END
+
+        -- 5. Get by TransactionID
+        ELSE IF @Action = 'GET'
+        BEGIN
+            SELECT c.*, f.*, v.*
+            FROM PreparationDocumentConfiguration c
+            LEFT JOIN PreparationDocumentFundConfiguration f
+                ON c.PreparationDocumentConfigurationId = f.PreparationDocumentConfigurationId
+            LEFT JOIN PreparationDocumentConfigurationVersion v
+                ON c.PreparationDocumentConfigurationId = v.PreparationDocumentConfigurationId
+            WHERE c.FilingTransactionID = @FilingTransactionID;
+
+            SELECT 'Data Retrieved Successfully' AS Message;
+        END
+
+        ELSE
+        BEGIN
+            SELECT 'Invalid Action Provided' AS Message;
+        END
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error: ' + ERROR_MESSAGE() AS Message;
+    END CATCH
+END
+
+```
