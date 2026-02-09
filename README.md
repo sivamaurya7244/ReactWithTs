@@ -44,3 +44,22 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+```
+Mere paas SQL Server mein ye tables hain:
+
+PreparationDocumentConfiguration
+PreparationDocumentFundConfiguration
+PreparationDocumentConfigurationVersion
+
+Mujhe ek stored procedure design karna hai jo FilingTransactionID ke base par 
+latest entry return kare. Latest entry ka matlab hamesha 
+PreparationDocumentConfigurationVersion table se highest VersionNo wala record hoga, 
+aur uske saath related PreparationDocumentConfiguration aur 
+PreparationDocumentFundConfiguration bhi aa jaaye.
+
+Stored procedure ka naam usp_GetLatestPreparationDocumentConfig ho 
+aur input parameter FilingTransactionID ho.
+
+
+```
